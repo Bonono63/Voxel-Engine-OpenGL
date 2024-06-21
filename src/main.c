@@ -75,7 +75,7 @@ int main ()
             mesh_data = realloc(mesh_data, voxel_count * 12 * 3 * sizeof(float));
 
             // top face
-
+            *(mesh_data+(voxel_count * 36)) = 
         }
     }
 
