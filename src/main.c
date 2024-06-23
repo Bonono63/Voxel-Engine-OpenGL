@@ -19,6 +19,24 @@ typedef struct Chunk
     struct Voxel data[32768];
 } Chunk;
 
+float frame_delta;
+double last_x, last_y;
+bool first_mouse = true;
+struct Camera camera = {
+    .fov = 70.0f,
+    .speed = 4.0f,
+    .sensitivity = 0.125f,
+    .position = {0.0f,0.0f,-3.0f},
+    .direction = {0.0f,0.0f,-1.0f},
+    .up = {0.0f,1.0f,0.0f},
+    .pitch = 0.0f,
+    .yaw = 0.0f,
+    .roll = 0.0f
+};
+// Using callbacks because they can be called ASAP instead of by frame increasing responsiveness
+void cursor_position_callback(GLFWwindow* window, double x, double y);
+void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
+
 int main ()
 {
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
@@ -26,7 +44,7 @@ int main ()
 
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-    uint32_t height=600,width=800;
+    int32_t height=600,width=800;
     GLFWwindow* window;
 
     if (!glfwInit())
@@ -35,7 +53,7 @@ int main ()
         return -1;
     }
 
-    window = glfwCreateWindow(width, height, "V Project", NULL, NULL);
+    window = glfwCreateWindow(width, height, "Voyager", NULL, NULL);
     if (!window)
     {
         glfwTerminate();
@@ -47,7 +65,8 @@ int main ()
     gladLoadGL(glfwGetProcAddress);
 
     glfwSetFramebufferSizeCallback(window, window_resize_callback);
-
+    glfwSetCursorPosCallback(window, cursor_position_callback);
+    glfwSetKeyCallback(window, key_callback);
 
     struct Chunk chunk;
     for ( int i = 0 ; i < 32768 ; i++)
@@ -75,13 +94,13 @@ int main ()
             mesh_data = realloc(mesh_data, voxel_count * 12 * 3 * sizeof(float));
 
             // top face
-            *(mesh_data+(voxel_count * 36)) = 
+            //*(mesh_data+(voxel_count * 36)) = 
         }
     }
 
-    struct Mesh chunk_mesh;
+    //struct Mesh chunk_mesh;
 
-    chunk_mesh = create_mesh(mesh_data, sizeof(mesh_data)*sizeof(float), "resources/chunk.glsl", "resources/chunk_fragment.glsl");
+    //chunk_mesh = create_mesh(mesh_data, sizeof(mesh_data)*sizeof(float), "resources/chunk.glsl", "resources/chunk_fragment.glsl");
 
     //Test triangle
     float vbo_data[] = {
@@ -102,15 +121,24 @@ int main ()
     glEnable(GL_CULL_FACE);
     //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
-    struct Camera camera = {.fov = 70, .speed = 4, .sensitivity = 0.5};
-    camera.position[0] = 0;
-    camera.position[1] = 0;
-    camera.position[2] = 0;
+    // initialize camera view matrix
+    glm_mat4_identity(camera.view);
 
     glfwGetWindowSize(window, &width, &height);
     float aspect = width/height;
-    glm_perspective(camera.fov, aspect, 0.001, 1000.0, camera.projection);
+    glm_perspective(camera.fov, aspect, 0.001f, 1000.0f, camera.projection);
 
+    // initialize object variables
+    glm_mat4_identity(cube.object_transform);
+    vec3 transform = {0.0f,0.0f,1.0f};
+    glm_translate(cube.object_transform, transform);
+
+    // set to zero for no vsync
+    glfwSwapInterval(1);
+
+    glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+
+    // render loop
     while(!glfwWindowShouldClose(window))
     {
         glClearColor(0.1f,0.1f,0.1f,1.0f);
@@ -118,7 +146,7 @@ int main ()
 
         camera_process(&camera);
 
-        render_mesh(&cube, &camera);
+        render_mesh_camera(&cube, &camera);
 
         glfwSwapBuffers(window);
 
@@ -127,4 +155,50 @@ int main ()
 
     glfwTerminate();
     return 0;
+}
+
+void cursor_position_callback(GLFWwindow *window, double x, double y)
+{
+    if (first_mouse)
+    {
+        last_x = x;
+        last_y = y;
+        first_mouse = false;
+    }
+
+    float x_offset = x - last_x;
+    float y_offset = y - last_y;
+    last_x = x;
+    last_y = y;
+
+    x_offset *= camera.sensitivity;
+    y_offset *= camera.sensitivity;
+
+    camera.yaw += x_offset;
+    camera.pitch += y_offset;
+
+    if (camera.pitch > 89.0f)
+        camera.pitch = 89.0f;
+    if (camera.pitch < -89.0f)
+        camera.pitch = -89.0f;
+
+    camera.direction[0] = cos(glm_rad(camera.yaw)) * cos(glm_rad(camera.pitch));
+    camera.direction[1] = sin(glm_rad(camera.pitch));
+    camera.direction[2] = sin(glm_rad(camera.yaw)) * cos(glm_rad(camera.pitch));
+}
+
+void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
+{
+    if (key == GLFW_KEY_ESCAPE && action == GLFW_PRESS)
+        glfwSetWindowShouldClose(window, true);
+
+    if (key == GLFW_KEY_W && action == GLFW_PRESS)
+    {
+        vec3 transform;
+        glm_vec3_copy(camera.direction, transform);
+        glm_vec3_scale(transform, frame_delta, transform);
+        glm_vec3_scale(transform, camera.speed, transform);
+        printf("transform: %f %f %f\n", transform[0], transform[1], transform[2]);
+        glm_vec3_add(camera.position, transform, camera.position);
+    }
 }

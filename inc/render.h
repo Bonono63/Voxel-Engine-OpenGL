@@ -34,7 +34,7 @@ void set_shader_value_matrix4(const char *loc, mat4 value, unsigned int shader_p
 // basic mesh with just vertices
 struct Mesh create_mesh(float *vbo_data, size_t vbo_size, const char* vertex_shader_path, const char* fragment_shader_path);
 void render_mesh(struct Mesh *i);
-void render_mesh(struct Mesh *i, struct Camera *camera);
+void render_mesh_camera(struct Mesh *i, struct Camera *camera);
 
 struct Lattice create_lattice(const char *vertex_path, const char *fragment_path, uint8_t size);
 void draw_lattice(GLFWwindow *window, struct Lattice *lattice, struct Camera *camera);

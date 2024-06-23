@@ -4,6 +4,7 @@
 
 void camera_process(struct Camera *camera)
 {
+    printf("%5.3f %5.3f %5.3f %f %f\r", camera->position[0], camera->position[1], camera->position[2], camera->yaw, camera->pitch);
     glm_look(camera->position, camera->direction, camera->up, camera->view);
 }
 
@@ -117,7 +118,7 @@ void set_shader_value_vec3(const char *loc, vec3 value, unsigned int shader_prog
         glUniform3f(location, value[0], value[1], value[2]);
 }
 
-void set_shader_value_mat4(const char *loc, mat4 value, unsigned int shader_program)
+void set_shader_value_matrix4(const char *loc, mat4 value, unsigned int shader_program)
 {
     int location = glGetUniformLocation(shader_program, loc);
     if (location == -1)
@@ -180,9 +181,9 @@ void draw_lattice(GLFWwindow *window, struct Lattice *lattice, struct Camera *ca
     glfwGetWindowSize(window, &width, &height);
     glm_perspective(camera->fov, width/height, 0.000001f, 400.0f, camera->projection);
 
-    set_shader_value_mat4("model", lattice->transform, lattice->shader);
-    set_shader_value_mat4("view", camera->view, lattice->shader);
-    set_shader_value_mat4("perspective", camera->projection, lattice->shader);
+    set_shader_value_matrix4("model", lattice->transform, lattice->shader);
+    set_shader_value_matrix4("view", camera->view, lattice->shader);
+    set_shader_value_matrix4("perspective", camera->projection, lattice->shader);
 
     glDrawArrays(GL_TRIANGLES, 0, lattice->vbo_size);
 }
@@ -620,14 +621,14 @@ void render_mesh(struct Mesh *i)
     glDrawArrays(GL_TRIANGLES, 0, i->vbo_size);
 }
 
-void render_mesh(struct Mesh *i, struct Camera *camera)
+void render_mesh_camera(struct Mesh *i, struct Camera *camera)
 {
     glUseProgram(i->shader);
     glBindVertexArray(i->vao);
 
-    mat4 proj_view;
-    glm_mat4_mul(camera->proj, camera->view, proj_view);
-    set_shader_value_matrix4("proj_view", proj_view, i->shader);
+    set_shader_value_matrix4("proj", camera->projection, i->shader);
+    set_shader_value_matrix4("view", camera->view, i->shader);
+    set_shader_value_matrix4("model", i->object_transform, i->shader);
     glDrawArrays(GL_TRIANGLES, 0, i->vbo_size);
 }
 
