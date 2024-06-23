@@ -1,4 +1,2 @@
-./engine.exe
-./*.o
-
-
+*.o
+*.exe
