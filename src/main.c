@@ -19,7 +19,7 @@ typedef struct Chunk
     struct Voxel data[32768];
 } Chunk;
 
-float frame_delta;
+float frame_delta = 0.0f;
 double last_x, last_y;
 bool first_mouse = true;
 struct Camera camera = {
@@ -33,9 +33,11 @@ struct Camera camera = {
     .yaw = 0.0f,
     .roll = 0.0f
 };
-// Using callbacks because they can be called ASAP instead of by frame increasing responsiveness
 void cursor_position_callback(GLFWwindow* window, double x, double y);
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
+
+bool w=false, a=false, s=false, d=false, shift=false, space=false;
+void input_process();
 
 int main ()
 {
@@ -105,21 +107,21 @@ int main ()
     //Test triangle
     float vbo_data[] = {
         //pos color
-         1.0f, 1.0f,0.0,
-        -1.0f, 1.0f,0.0,
-        -1.0f,-1.0f,0.0,
+         1.0f, 1.0f,1.0f,
+        -1.0f, 1.0f,1.0f,
+        -1.0f,-1.0f,1.0f,
         
-        -1.0f,-1.0f,0.0,
-         1.0f,-1.0f,0.0,
-         1.0f, 1.0f,0.0
+        -1.0f,-1.0f,1.0f,
+         1.0f,-1.0f,1.0f,
+         1.0f, 1.0f,1.0f
     };
 
     struct Mesh cube;
 
     cube = create_mesh(vbo_data, sizeof(vbo_data)*sizeof(float), "resources/vertex.glsl", "resources/fragment.glsl");
 
-    glEnable(GL_CULL_FACE);
-    //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+    //glEnable(GL_CULL_FACE);
+    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
     // initialize camera view matrix
     glm_mat4_identity(camera.view);
@@ -138,11 +140,18 @@ int main ()
 
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
+    float prev_frame_time = 0.0f;
     // render loop
     while(!glfwWindowShouldClose(window))
     {
         glClearColor(0.1f,0.1f,0.1f,1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
+
+        float current_frame_time = glfwGetTime();
+        frame_delta = current_frame_time - prev_frame_time;
+        prev_frame_time = current_frame_time;
+
+        input_process();
 
         camera_process(&camera);
 
@@ -175,12 +184,17 @@ void cursor_position_callback(GLFWwindow *window, double x, double y)
     y_offset *= camera.sensitivity;
 
     camera.yaw += x_offset;
-    camera.pitch += y_offset;
+    camera.pitch -= y_offset;
 
     if (camera.pitch > 89.0f)
         camera.pitch = 89.0f;
     if (camera.pitch < -89.0f)
         camera.pitch = -89.0f;
+
+    if (camera.yaw > 360)
+        camera.yaw = 0;
+    if (camera.yaw < 0)
+        camera.yaw += 360;
 
     camera.direction[0] = cos(glm_rad(camera.yaw)) * cos(glm_rad(camera.pitch));
     camera.direction[1] = sin(glm_rad(camera.pitch));
@@ -193,12 +207,65 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
         glfwSetWindowShouldClose(window, true);
 
     if (key == GLFW_KEY_W && action == GLFW_PRESS)
+        w = true;
+    if (key == GLFW_KEY_W && action == GLFW_RELEASE)
+        w = false;
+
+    if (key == GLFW_KEY_A && action == GLFW_PRESS)
+        a = true;
+    if (key == GLFW_KEY_A && action == GLFW_RELEASE)
+        a = false;
+
+    if (key == GLFW_KEY_S && action == GLFW_PRESS)
+        s = true;
+    if (key == GLFW_KEY_S && action == GLFW_RELEASE)
+        s = false;
+    
+    if (key == GLFW_KEY_D && action == GLFW_PRESS)
+        d = true;
+    if (key == GLFW_KEY_D && action == GLFW_RELEASE)
+        d = false;
+}
+
+void input_process()
+{
+    if (w)
     {
         vec3 transform;
         glm_vec3_copy(camera.direction, transform);
+        glm_normalize(transform);
         glm_vec3_scale(transform, frame_delta, transform);
         glm_vec3_scale(transform, camera.speed, transform);
-        printf("transform: %f %f %f\n", transform[0], transform[1], transform[2]);
+        glm_vec3_add(camera.position, transform, camera.position);
+    }
+    
+    if (s)
+    {
+        vec3 transform;
+        glm_vec3_copy(camera.direction, transform);
+        glm_normalize(transform);
+        glm_vec3_scale(transform, frame_delta, transform);
+        glm_vec3_scale(transform, camera.speed, transform);
+        glm_vec3_sub(camera.position, transform, camera.position);
+    }
+
+    if (a)
+    {
+        vec3 transform;
+        // right vector?
+        glm_vec3_crossn(camera.direction, camera.up, transform);
+        glm_vec3_scale(transform, frame_delta, transform);
+        glm_vec3_scale(transform, camera.speed, transform);
+        glm_vec3_sub(camera.position, transform, camera.position);
+    }
+    
+    if (d)
+    {
+        vec3 transform;
+        // right vector?
+        glm_vec3_crossn(camera.direction, camera.up, transform);
+        glm_vec3_scale(transform, frame_delta, transform);
+        glm_vec3_scale(transform, camera.speed, transform);
         glm_vec3_add(camera.position, transform, camera.position);
     }
 }
