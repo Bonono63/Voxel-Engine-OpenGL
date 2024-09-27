@@ -1,2 +1,6 @@
 *.o
 *.exe
+*.out
+engine
+./glfw-3.4/build
+./cglm-0.9.4/build
