@@ -6,7 +6,7 @@ LIB_DIR += -L./glfw-3.4/bin/src/
 INC_DIR += -I./cglm-0.9.4/include/
 LIB_DIR += -L./cglm-0.9.4/build/
 
-LIBS = -lglfw3 -lcglm
+LIBS = -lglfw -lcglm -lm
 
 CC=gcc
 CFLAGS=-I$(INC_DIR) -L$(LIB_DIR) -O0 -g -Wall
