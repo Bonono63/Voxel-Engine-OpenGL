@@ -70,6 +70,7 @@ int main ()
     glfwSetCursorPosCallback(window, cursor_position_callback);
     glfwSetKeyCallback(window, key_callback);
 
+    // 32**3 = 32768
     struct Chunk chunk;
     for ( int i = 0 ; i < 32768 ; i++)
     {
@@ -78,47 +79,54 @@ int main ()
         chunk.data[i] = v;
     }
 
-    // For now allocates the maximum amount of space required for our chunk
-    float *mesh_data = (float*) calloc(0, 0);
+    // 6 faces, 3 triangles, 3 vertices per triangle, 6 vertices per face
+    //Maximum vertex count for chunk: 32768 * 6 * 6
+    //float count is max chunk size * 3
 
-    int voxel_count = 0;
+    const size_t FLOATS_PER_VERTEX = 3;
+    const size_t VERTICES_PER_FACE = 6;
+    const size_t FACES_PER_VOXEL = 6;
+    const size_t FLOATS_PER_VOXEL = FLOATS_PER_VERTEX * VERTICES_PER_FACE * FACES_PER_VOXEL;
+    const size_t MESH_DATA_SIZE = 32768 * 6 * 6 * 3;
+
+    printf("floats per face: %zu\n", FLOATS_PER_VOXEL);
+    printf("mesh data size: %zu\n", MESH_DATA_SIZE);
+
+    // For now allocates the maximum amount of space required for our chunk
+    float *mesh_data = (float*) calloc(1, MESH_DATA_SIZE*sizeof(float));
+
     for (int i = 0 ; i < 32768 ; i++)
     {
-        int id = chunk.data->type+i;
-        if (id == 1)
-        {
-            voxel_count++;
-            int x = i % 32;
-            int y = i / 32 / 32 % 32;
-            int z = i / 32 % 32;
-            
-            // arbitrary size of mesh, 12 vertices per voxel, 3 floats per vertex, 4 bytes per float
-            mesh_data = realloc(mesh_data, voxel_count * 12 * 3 * sizeof(float));
+        // face 1
+        *(mesh_data+(i*FLOATS_PER_VOXEL)+0) = 1.0f;
+        *(mesh_data+(i*FLOATS_PER_VOXEL)+1) = 1.0f;
+        *(mesh_data+(i*FLOATS_PER_VOXEL)+2) = 1.0f;
 
-            // top face
-            //*(mesh_data+(voxel_count * 36)) = 
-        }
+        *(mesh_data+(i*FLOATS_PER_VOXEL)+3) = -1.0f;
+        *(mesh_data+(i*FLOATS_PER_VOXEL)+4) = 1.0f;
+        *(mesh_data+(i*FLOATS_PER_VOXEL)+5) = 1.0f;
+
+        *(mesh_data+(i*FLOATS_PER_VOXEL)+6) = -1.0f;
+        *(mesh_data+(i*FLOATS_PER_VOXEL)+7) = -1.0f;
+        *(mesh_data+(i*FLOATS_PER_VOXEL)+8) = 1.0f;
+
+        // face 2
+        *(mesh_data+(i*FLOATS_PER_VOXEL)+9) = -1.0f;
+        *(mesh_data+(i*FLOATS_PER_VOXEL)+10) = -1.0f;
+        *(mesh_data+(i*FLOATS_PER_VOXEL)+11) = 1.0f;
+
+        *(mesh_data+(i*FLOATS_PER_VOXEL)+12) = -1.0f;
+        *(mesh_data+(i*FLOATS_PER_VOXEL)+13) = -1.0f;
+        *(mesh_data+(i*FLOATS_PER_VOXEL)+14) = 1.0f;
+
+        *(mesh_data+(i*FLOATS_PER_VOXEL)+15) = 1.0f;
+        *(mesh_data+(i*FLOATS_PER_VOXEL)+16) = -1.0f;
+        *(mesh_data+(i*FLOATS_PER_VOXEL)+17) = 1.0f;
     }
 
-    //struct Mesh chunk_mesh;
+    struct Mesh chunk_mesh;
 
-    //chunk_mesh = create_mesh(mesh_data, sizeof(mesh_data)*sizeof(float), "resources/chunk.glsl", "resources/chunk_fragment.glsl");
-
-    //Test triangle
-    float vbo_data[] = {
-        //pos color
-         1.0f, 1.0f,1.0f,
-        -1.0f, 1.0f,1.0f,
-        -1.0f,-1.0f,1.0f,
-        
-        -1.0f,-1.0f,1.0f,
-         1.0f,-1.0f,1.0f,
-         1.0f, 1.0f,1.0f
-    };
-
-    struct Mesh cube;
-
-    cube = create_mesh(vbo_data, sizeof(vbo_data)*sizeof(float), "resources/vertex.glsl", "resources/fragment.glsl");
+    chunk_mesh = create_mesh(mesh_data, MESH_DATA_SIZE*sizeof(float), "resources/vertex.glsl", "resources/fragment.glsl");
 
     //glEnable(GL_CULL_FACE);
     glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -131,13 +139,14 @@ int main ()
     glm_perspective(camera.fov, aspect, 0.001f, 1000.0f, camera.projection);
 
     // initialize object variables
-    glm_mat4_identity(cube.object_transform);
+    glm_mat4_identity(chunk_mesh.object_transform);
     vec3 transform = {0.0f,0.0f,1.0f};
-    glm_translate(cube.object_transform, transform);
+    glm_translate(chunk_mesh.object_transform, transform);
 
     // set to zero for no vsync
     glfwSwapInterval(1);
 
+//    glEnable(GL_CULL_FACE);
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
 
     float prev_frame_time = 0.0f;
@@ -155,7 +164,7 @@ int main ()
 
         camera_process(&camera);
 
-        render_mesh_camera(&cube, &camera);
+        render_mesh_camera(&chunk_mesh, &camera);
 
         glfwSwapBuffers(window);
 
