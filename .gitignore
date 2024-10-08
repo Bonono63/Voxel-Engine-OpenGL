@@ -1,4 +1,7 @@
 *.o
 *.exe
 *.out
+*.a
+*.dll
 engine
+/glfw-3.4/build
