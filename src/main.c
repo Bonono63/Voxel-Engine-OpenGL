@@ -5,27 +5,22 @@
 #include <cglm/struct.h>
 #include <io.h>
 #include <render.h>
-
-typedef struct Voxel
-{
-    uint8_t type;
-    //binary flags indicating voxel details
-    uint8_t flags;
-} Voxel;
-
-typedef struct Chunk
-{
-    // 32*32*32 one dimensional array because it is quick despite it's resource inefficiency
-    struct Voxel data[32768];
-} Chunk;
+#include <voxel.h>
 
 float frame_delta = 0.0f;
 double last_x, last_y;
 bool first_mouse = true;
+
+void cursor_position_callback(GLFWwindow* window, double x, double y);
+void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
+
+bool w=false, a=false, s=false, d=false, shift=false, space=false, wire_frame=false;
+void input_process();
+
 struct Camera camera = {
     .fov = 70.0f,
     .speed = 4.0f,
-    .sensitivity = 0.125f,
+    .sensitivity = 0.15f,
     .position = {0.0f,0.0f,-3.0f},
     .direction = {0.0f,0.0f,-1.0f},
     .up = {0.0f,1.0f,0.0f},
@@ -33,20 +28,17 @@ struct Camera camera = {
     .yaw = 0.0f,
     .roll = 0.0f
 };
-void cursor_position_callback(GLFWwindow* window, double x, double y);
-void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods);
-
-bool w=false, a=false, s=false, d=false, shift=false, space=false;
-void input_process();
 
 int main ()
 {
+    int error = 0;
+
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 4);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
 
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
-    int32_t height=600,width=800;
+    int32_t height=900,width=900;
     GLFWwindow* window;
 
     if (!glfwInit())
@@ -66,77 +58,42 @@ int main ()
     glfwMakeContextCurrent(window);
     gladLoadGL(glfwGetProcAddress);
 
+    printf("Opengl Version: %s\n",glGetString(GL_VERSION));
+
     glfwSetFramebufferSizeCallback(window, window_resize_callback);
     glfwSetCursorPosCallback(window, cursor_position_callback);
     glfwSetKeyCallback(window, key_callback);
 
+    error = glGetError();
+    printf("[Initialization] error: 0x%x\n", error);
+
+    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+
     // 32**3 = 32768
     struct Chunk chunk;
-    for ( int i = 0 ; i < 32768 ; i++)
+    for ( int i = 0 ; i < CHUNK_DATA_SIZE ; i++)
     {
-        struct Voxel v;
-        v.type = rand() % 2;
-        chunk.data[i] = v;
+        chunk.voxel_type[i] = rand() % 2;
     }
 
-    // 6 faces, 3 triangles, 3 vertices per triangle, 6 vertices per face
-    //Maximum vertex count for chunk: 32768 * 6 * 6
-    //float count is max chunk size * 3
+    generate_chunk_bitmask(&chunk);
 
-    const size_t FLOATS_PER_VERTEX = 3;
-    const size_t VERTICES_PER_FACE = 6;
-    const size_t FACES_PER_VOXEL = 6;
-    const size_t FLOATS_PER_VOXEL = FLOATS_PER_VERTEX * VERTICES_PER_FACE * FACES_PER_VOXEL;
-    const size_t MESH_DATA_SIZE = 32768 * 6 * 6 * 3;
+    struct Lattice chunk_mesh;
 
-    printf("floats per face: %zu\n", FLOATS_PER_VOXEL);
-    printf("mesh data size: %zu\n", MESH_DATA_SIZE);
+    chunk_mesh = create_lattice("resources/lattice_vertex.glsl", "resources/lattice_fragment.glsl", 32);
 
-    // For now allocates the maximum amount of space required for our chunk
-    float *mesh_data = (float*) calloc(1, MESH_DATA_SIZE*sizeof(float));
-
-    for (int i = 0 ; i < 32768 ; i++)
-    {
-        // face 1
-        *(mesh_data+(i*FLOATS_PER_VOXEL)+0) = 1.0f;
-        *(mesh_data+(i*FLOATS_PER_VOXEL)+1) = 1.0f;
-        *(mesh_data+(i*FLOATS_PER_VOXEL)+2) = 1.0f;
-
-        *(mesh_data+(i*FLOATS_PER_VOXEL)+3) = -1.0f;
-        *(mesh_data+(i*FLOATS_PER_VOXEL)+4) = 1.0f;
-        *(mesh_data+(i*FLOATS_PER_VOXEL)+5) = 1.0f;
-
-        *(mesh_data+(i*FLOATS_PER_VOXEL)+6) = -1.0f;
-        *(mesh_data+(i*FLOATS_PER_VOXEL)+7) = -1.0f;
-        *(mesh_data+(i*FLOATS_PER_VOXEL)+8) = 1.0f;
-
-        // face 2
-        *(mesh_data+(i*FLOATS_PER_VOXEL)+9) = -1.0f;
-        *(mesh_data+(i*FLOATS_PER_VOXEL)+10) = -1.0f;
-        *(mesh_data+(i*FLOATS_PER_VOXEL)+11) = 1.0f;
-
-        *(mesh_data+(i*FLOATS_PER_VOXEL)+12) = -1.0f;
-        *(mesh_data+(i*FLOATS_PER_VOXEL)+13) = -1.0f;
-        *(mesh_data+(i*FLOATS_PER_VOXEL)+14) = 1.0f;
-
-        *(mesh_data+(i*FLOATS_PER_VOXEL)+15) = 1.0f;
-        *(mesh_data+(i*FLOATS_PER_VOXEL)+16) = -1.0f;
-        *(mesh_data+(i*FLOATS_PER_VOXEL)+17) = 1.0f;
-    }
-
-    struct Mesh chunk_mesh;
-
-    chunk_mesh = create_mesh(mesh_data, MESH_DATA_SIZE*sizeof(float), "resources/vertex.glsl", "resources/fragment.glsl");
-
-    //glEnable(GL_CULL_FACE);
-    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+    chunk_mesh.texture = generate_chunk_lattice_texture(&chunk);
 
     // initialize camera view matrix
     glm_mat4_identity(camera.view);
 
     glfwGetWindowSize(window, &width, &height);
-    float aspect = width/height;
-    glm_perspective(camera.fov, aspect, 0.001f, 1000.0f, camera.projection);
+
+    //TODO: formalize this somewhere else
+    float aspect = (float) width/height;
+    glm_perspective(camera.fov, aspect, 0.001f, 4000.0f, camera.projection);
+    camera.width = width;
+    camera.height = height;
 
     // initialize object variables
     glm_mat4_identity(chunk_mesh.object_transform);
@@ -144,27 +101,51 @@ int main ()
     glm_translate(chunk_mesh.object_transform, transform);
 
     // set to zero for no vsync
-    glfwSwapInterval(1);
+    glfwSwapInterval(0);
 
-//    glEnable(GL_CULL_FACE);
+    glEnable(GL_CULL_FACE);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    glEnable(GL_DEPTH_TEST);
+    
+    //glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
     glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
+
+    //if (chunk_mesh.texture == 0 )
+    //{
+    //    printf("Error generating lattice chunk texture\n");
+    //    exit(-1);
+    //}
+
+    printf("chunk mesh texture id: %d\n", chunk_mesh.texture);
+    glBindTexture(GL_TEXTURE_3D, chunk_mesh.texture);
+
+    printf("client render loop start\n");
+
+    error = glGetError();
+    printf("[Post Initialization] error: 0x%x\n", error);
 
     float prev_frame_time = 0.0f;
     // render loop
     while(!glfwWindowShouldClose(window))
     {
+        printf("\r");
+
         glClearColor(0.1f,0.1f,0.1f,1.0f);
-        glClear(GL_COLOR_BUFFER_BIT);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         float current_frame_time = glfwGetTime();
         frame_delta = current_frame_time - prev_frame_time;
         prev_frame_time = current_frame_time;
 
+        printf("fd: %f ", frame_delta);
+
         input_process();
+        printf("wire_frame: %d ", wire_frame);
 
         camera_process(&camera);
 
-        render_mesh_camera(&chunk_mesh, &camera);
+        render_lattice(&chunk_mesh, &camera);
 
         glfwSwapBuffers(window);
 
@@ -234,9 +215,31 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
         d = true;
     if (key == GLFW_KEY_D && action == GLFW_RELEASE)
         d = false;
+
+    if (key == GLFW_KEY_SPACE && action == GLFW_PRESS)
+        space = true;
+    if (key == GLFW_KEY_SPACE && action == GLFW_RELEASE)
+        space = false;
+
+    if (key == GLFW_KEY_LEFT_SHIFT && action == GLFW_PRESS)
+        shift = true;
+    if (key == GLFW_KEY_LEFT_SHIFT && action == GLFW_RELEASE)
+        shift = false;
+
+    if (key == GLFW_KEY_G && action == GLFW_RELEASE)
+    {
+        if (wire_frame)
+        {
+            wire_frame = false;
+        }
+        else
+        {
+            wire_frame = true;
+        }
+    }
 }
 
-void input_process()
+void input_process(void)
 {
     if (w)
     {
@@ -273,8 +276,37 @@ void input_process()
         vec3 transform;
         // right vector?
         glm_vec3_crossn(camera.direction, camera.up, transform);
-        glm_vec3_scale(transform, frame_delta, transform);
-        glm_vec3_scale(transform, camera.speed, transform);
+        glm_vec3_scale(transform, frame_delta*camera.speed, transform);
         glm_vec3_add(camera.position, transform, camera.position);
     }
+
+    if (space)
+    {
+        vec3 transform;
+        glm_vec3_copy(camera.up, transform);
+        glm_vec3_scale(transform, frame_delta*camera.speed, transform);
+        glm_vec3_add(camera.position, transform, camera.position);
+    }
+
+    if (shift)
+    {
+        vec3 transform;
+        glm_vec3_copy(camera.up, transform);
+        glm_vec3_scale(transform, -frame_delta*camera.speed, transform);
+        glm_vec3_add(camera.position, transform, camera.position);
+    }
+}
+
+/*
+ * Changes the size of the viewport and updates the 3D camera's 
+ * perspective matrix according to the new viewport height and width.
+ *
+ * Without updating the perspective matrix we end up warping the environment.
+ * */
+void window_resize_callback(GLFWwindow *window, int width, int height)
+{
+    glViewport(0,0, width, height);
+    camera.width = width;
+    camera.height = height;
+    glm_perspective(camera.fov, (float) width/height, 0.000001f, MAX_RENDER_DISTANCE, camera.projection);
 }

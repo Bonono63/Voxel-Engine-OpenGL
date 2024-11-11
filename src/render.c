@@ -4,7 +4,7 @@
 
 void camera_process(struct Camera *camera)
 {
-    printf("%5.3f %5.3f %5.3f %f %f\r", camera->position[0], camera->position[1], camera->position[2], camera->yaw, camera->pitch);
+    printf("%5.3f %5.3f %5.3f %f %f", camera->position[0], camera->position[1], camera->position[2], camera->yaw, camera->pitch);
     glm_look(camera->position, camera->direction, camera->up, camera->view);
 }
 
@@ -18,8 +18,6 @@ unsigned int load_shader(const char * vertex_shader_path, const char * fragment_
         printf("Unable to compile shader. Vertex shader couldn't be found.\n");
         return -1;
     }
-
-    //printf("vertex shader contents: %s", vertex_source);
 
     unsigned int vertex_shader;
     vertex_shader = glCreateShader(GL_VERTEX_SHADER);
@@ -128,9 +126,12 @@ void set_shader_value_matrix4(const char *loc, mat4 value, unsigned int shader_p
         glUniformMatrix4fv(location, 1, GL_FALSE, value[0]);
 }
 
-struct Lattice create_lattice(const char *vertex_path, const char *fragment_path, uint8_t size)
+struct Lattice create_lattice(const char *vertex_path, const char *fragment_path, uint16_t size)
 {
-    struct Lattice result;
+    struct Lattice result = {
+        .scale = 0.1f,
+        .size = size
+    };
 
     glGenVertexArrays(1, &result.vao);
 
@@ -143,9 +144,9 @@ struct Lattice create_lattice(const char *vertex_path, const char *fragment_path
     // Generate lattice data
     
     float *vbo_data;
-    unsigned long long int vbo_size = 0;
+    size_t vbo_size = 0;
 
-    create_lattice_mesh_data(size, 1.0f, &vbo_data, &vbo_size);
+    create_lattice_mesh_data(size, result.scale, &vbo_data, &vbo_size);
 
     result.vbo_size = vbo_size;
 
@@ -153,9 +154,11 @@ struct Lattice create_lattice(const char *vertex_path, const char *fragment_path
 
     // Configure vertex data
 
+    // vertices
     glVertexAttribPointer(0,3,GL_FLOAT,GL_FALSE,6*sizeof(float),(void*)0);
     glEnableVertexAttribArray(0);
 
+    // uvs
     glVertexAttribPointer(1,3,GL_FLOAT,GL_FALSE,6*sizeof(float),(void*)(3*sizeof(float)));
     glEnableVertexAttribArray(1);
 
@@ -171,27 +174,11 @@ struct Lattice create_lattice(const char *vertex_path, const char *fragment_path
     return result;
 }
 
-void draw_lattice(GLFWwindow *window, struct Lattice *lattice, struct Camera *camera)
+void create_lattice_mesh_data(uint16_t size, float voxel_scale, float **out, size_t *out_size)
 {
-    glBindVertexArray(lattice->vao);
-
-    glUseProgram(lattice->shader);
-
-    int width,height;
-    glfwGetWindowSize(window, &width, &height);
-    glm_perspective(camera->fov, width/height, 0.000001f, 400.0f, camera->projection);
-
-    set_shader_value_matrix4("model", lattice->transform, lattice->shader);
-    set_shader_value_matrix4("view", camera->view, lattice->shader);
-    set_shader_value_matrix4("perspective", camera->projection, lattice->shader);
-
-    glDrawArrays(GL_TRIANGLES, 0, lattice->vbo_size);
-}
-
-void create_lattice_mesh_data(uint8_t size, float voxel_scale, float **out, unsigned long long *out_size)
-{
-    const int vertex_stride = 6;
-    const int index_stride = 6;
+    //TODO: We are allocating significantly more memory than is required for some reason...
+    const uint8_t vertex_stride = 6;
+    const uint8_t index_stride = 6;
 
     long long int vertex_offset = 0;
 
@@ -200,8 +187,11 @@ void create_lattice_mesh_data(uint8_t size, float voxel_scale, float **out, unsi
     size_t float_count = face_count * index_stride * vertex_stride;
     size_t byte_count = float_count*sizeof(float);
     
-    *out = (float *) malloc(byte_count);
+    *out = (float *) calloc(1, byte_count);
     *out_size = byte_count;
+
+    printf("vertex count: %zu\n", float_count / 3);
+    printf("lattice data size: %zu\n", byte_count);
 
     if (*out == NULL)
     {
@@ -614,14 +604,19 @@ struct Mesh create_mesh(float *vbo_data, size_t vbo_size, const char* vertex_sha
     return mesh;
 }
 
-void render_mesh(struct Mesh *i)
+void render_mesh(struct Mesh *i, Camera *camera)
 {
     glUseProgram(i->shader);
     glBindVertexArray(i->vao);
+//    glDrawArrays(GL_TRIANGLES, 0, i->vbo_size);
+
+    set_shader_value_matrix4("proj", camera->projection, i->shader);
+    set_shader_value_matrix4("view", camera->view, i->shader);
+    set_shader_value_matrix4("model", i->object_transform, i->shader);
     glDrawArrays(GL_TRIANGLES, 0, i->vbo_size);
 }
 
-void render_mesh_camera(struct Mesh *i, struct Camera *camera)
+void render_lattice(struct Lattice *i, struct Camera *camera)
 {
     glUseProgram(i->shader);
     glBindVertexArray(i->vao);
@@ -630,9 +625,4 @@ void render_mesh_camera(struct Mesh *i, struct Camera *camera)
     set_shader_value_matrix4("view", camera->view, i->shader);
     set_shader_value_matrix4("model", i->object_transform, i->shader);
     glDrawArrays(GL_TRIANGLES, 0, i->vbo_size);
-}
-
-void window_resize_callback(GLFWwindow* window, int width, int height)
-{
-    glViewport(0,0,width,height);
 }
