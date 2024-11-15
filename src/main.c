@@ -29,12 +29,12 @@ struct Camera camera = {
     .roll = 0.0f
 };
 
-int main ()
+int main (void)
 {
     int error = 0;
 
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
-    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 6);
+    glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 4);
 
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
 
@@ -47,7 +47,7 @@ int main ()
         return -1;
     }
 
-    window = glfwCreateWindow(width, height, "Voyager", NULL, NULL);
+    window = glfwCreateWindow(width, height, "Voyager [OpenGL]", NULL, NULL);
     if (!window)
     {
         glfwTerminate();
@@ -67,7 +67,7 @@ int main ()
     error = glGetError();
     printf("[Initialization] error: 0x%x\n", error);
 
-    glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
+    //glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
 
     // 32**3 = 32768
     struct Chunk chunk;
@@ -124,6 +124,8 @@ int main ()
 
     error = glGetError();
     printf("[Post Initialization] error: 0x%x\n", error);
+
+    printf("Lattice info:\n\ttexture: %u\n", chunk_mesh.texture);
 
     float prev_frame_time = 0.0f;
     // render loop

@@ -144,13 +144,10 @@ struct Lattice create_lattice(const char *vertex_path, const char *fragment_path
     // Generate lattice data
     
     float *vbo_data;
-    size_t vbo_size = 0;
 
-    create_lattice_mesh_data(size, result.scale, &vbo_data, &vbo_size);
+    create_lattice_mesh_data(result.size, result.scale, &vbo_data, &result.vbo_size);
 
-    result.vbo_size = vbo_size;
-
-    glBufferData(GL_ARRAY_BUFFER, vbo_size, vbo_data, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, result.vbo_size, vbo_data, GL_STATIC_DRAW);
 
     // Configure vertex data
 
@@ -176,13 +173,12 @@ struct Lattice create_lattice(const char *vertex_path, const char *fragment_path
 
 void create_lattice_mesh_data(uint16_t size, float voxel_scale, float **out, size_t *out_size)
 {
-    //TODO: We are allocating significantly more memory than is required for some reason...
     const uint8_t vertex_stride = 6;
     const uint8_t index_stride = 6;
 
     long long int vertex_offset = 0;
 
-    printf("lattice dimensions: %dx%dx%d\n", size, size, size);
+    //printf("lattice dimensions: %dx%dx%d\n", size, size, size);
     size_t face_count = size*6;
     size_t float_count = face_count * index_stride * vertex_stride;
     size_t byte_count = float_count*sizeof(float);
@@ -190,7 +186,7 @@ void create_lattice_mesh_data(uint16_t size, float voxel_scale, float **out, siz
     *out = (float *) calloc(1, byte_count);
     *out_size = byte_count;
 
-    printf("vertex count: %zu\n", float_count / 3);
+    printf("vertex count: %zu\n", float_count / 6);
     printf("lattice data size: %zu\n", byte_count);
 
     if (*out == NULL)
@@ -616,13 +612,14 @@ void render_mesh(struct Mesh *i, Camera *camera)
     glDrawArrays(GL_TRIANGLES, 0, i->vbo_size);
 }
 
-void render_lattice(struct Lattice *i, struct Camera *camera)
+void render_lattice(struct Lattice *mesh, struct Camera *camera)
 {
-    glUseProgram(i->shader);
-    glBindVertexArray(i->vao);
+    glBindTexture(GL_TEXTURE_3D, mesh->texture);
+    glUseProgram(mesh->shader);
+    glBindVertexArray(mesh->vao);
 
-    set_shader_value_matrix4("proj", camera->projection, i->shader);
-    set_shader_value_matrix4("view", camera->view, i->shader);
-    set_shader_value_matrix4("model", i->object_transform, i->shader);
-    glDrawArrays(GL_TRIANGLES, 0, i->vbo_size);
+    set_shader_value_matrix4("proj", camera->projection, mesh->shader);
+    set_shader_value_matrix4("view", camera->view, mesh->shader);
+    set_shader_value_matrix4("model", mesh->object_transform, mesh->shader);
+    glDrawArrays(GL_TRIANGLES, 0, mesh->vbo_size);
 }
